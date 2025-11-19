@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SearchHub</title>
+    <link rel="stylesheet" href="nano.min.css"/>
+
+    <style>
+        :root { --bg-color: #050505; --card-bg: #1e1e1e; --text-main: #e0e0e0; --accent: #ff4757; --shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; user-select: none; transition: background-color 0.5s; }
+        
+        #space { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        #flash-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 9999; transition: opacity 0.2s ease-in; }
+        
+        .container { position: relative; z-index: 10; text-align: center; width: 100%; max-width: 600px; padding: 20px; }
+        .fade-out { opacity: 0 !important; transform: scale(0.95); pointer-events: none; transition: all 0.5s ease; }
+        
+        /* КЛОН */
+        .search-clone { position: fixed; display: flex; align-items: center; justify-content: center; background: var(--card-bg); color: var(--text-main); border-radius: 50px; font-size: 1.2rem; z-index: 1001; box-shadow: var(--shadow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 25px; border: 2px solid transparent; will-change: top, left, width, transform; transition: top 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), left 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.5s ease, color 0.5s ease, box-shadow 0.5s ease; }
+        .search-clone.launching { background: var(--accent) !important; color: var(--bg-color) !important; border-color: var(--accent) !important; box-shadow: 0 0 50px var(--accent) !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) scale(1.3) !important; }
+        
+        .hero-button { position: fixed !important; z-index: 1000 !important; transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) !important; box-shadow: 0 0 30px var(--accent) !important; background: var(--accent) !important; color: var(--bg-color) !important; border-color: var(--accent) !important; margin: 0 !important; }
+        
+        .clock { font-size: 1.5rem; font-weight: 300; color: var(--text-main); opacity: 0.7; margin-bottom: 5px; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,0,0,0.5); transition: opacity 0.5s; }
+        h1 { font-size: 4rem; margin-bottom: 20px; letter-spacing: 2px; color: var(--text-main); text-transform: uppercase; font-weight: 800; cursor: default; text-shadow: 0 4px 10px rgba(0,0,0,0.8); transition: opacity 0.5s; }
+        h1 span { color: var(--accent); text-shadow: 0 0 20px var(--accent); }
+        
+        /* ПОИСК */
+        .search-wrapper { position: relative; width: 100%; z-index: 20; }
+        .search-box { background: var(--card-bg); border-radius: 50px; padding: 10px; box-shadow: var(--shadow); display: flex; align-items: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 2px solid transparent; position: relative; }
+        @media (hover: hover) {
+            .search-box:hover { transform: translateY(-2px) scale(1.01); box-shadow: 0 8px 25px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.1); }
+        }
+        .search-box:focus-within { transform: scale(1.02); border-color: var(--accent); box-shadow: 0 0 25px rgba(0,0,0, 0.5); }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; border-color: var(--accent); }
+        
+        input[type="text"] { background: transparent; border: none; color: var(--text-main); font-size: 1.2rem; padding: 10px 20px; width: 100%; outline: none; user-select: text; }
+        input[type="text"]::placeholder { color: var(--text-main); opacity: 0.5; }
+        
+        button[type="submit"] { background: var(--accent); border: none; color: var(--bg-color); border-radius: 50%; width: 45px; height: 45px; min-width: 45px; flex-shrink: 0; cursor: pointer; font-weight: bold; transition: all 0.3s; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+        button[type="submit"]:hover { transform: scale(1.1); box-shadow: 0 0 15px var(--accent); }
+
+        /* ИСТОРИЯ */
+        .history-dropdown { position: absolute; top: 110%; left: 0; width: 100%; background: var(--card-bg); border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; z-index: 10; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all 0.2s ease; text-align: left; max-height: 300px; overflow-y: auto; }
+        .history-dropdown.active { opacity: 1; visibility: visible; transform: translateY(0); }
+        .history-item { padding: 15px 20px; cursor: pointer; color: var(--text-main); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; font-size: 1rem; }
+        .history-item:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+        .history-item:last-child { border-bottom: none; }
+        .clear-history { text-align: center; font-size: 0.9rem; padding: 12px; color: #888; cursor: pointer; background: rgba(0,0,0,0.2); }
+        .clear-history:hover { background: #ff4757; color: white; }
+
+        /* Links */
+        .links { margin-top: 40px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; z-index: 5; }
+        .link-card { background: var(--card-bg); padding: 15px 30px; border-radius: 25px; text-decoration: none; color: var(--text-main); font-weight: 600; box-shadow: var(--shadow); transition: all 0.3s ease; border-bottom: 3px solid transparent; transform-origin: center center; }
+        .link-card:hover { transform: translateY(-5px); border-bottom-color: var(--accent); background: rgba(255,255,255,0.05); }
+        
+        /* НАСТРОЙКИ */
+        .settings-btn { position: absolute; top: 20px; right: 20px; background: transparent; border: none; color: var(--text-main); font-size: 1.5rem; cursor: pointer; opacity: 0.3; transition: opacity 0.3s, transform 0.5s; z-index: 100; padding: 10px; }
+        .settings-btn:hover { opacity: 1; transform: rotate(90deg); }
+        
+        .settings-panel { 
+            position: absolute; top: 70px; right: 20px; background: var(--card-bg); 
+            padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
+            display: flex; flex-direction: column; gap: 20px; z-index: 99; width: 280px; 
+            border: 1px solid var(--accent); opacity: 0; visibility: hidden; 
+            transform: translateY(-10px); transition: all 0.3s ease; 
+        }
+        .settings-panel.active { opacity: 1; visibility: visible; transform: translateY(0); }
+        
+        .setting-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; font-weight: 500; position: relative; }
+        
+        .custom-select { position: relative; width: 140px; cursor: pointer; user-select: none; }
+        .select-selected { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); padding: 8px 15px; border-radius: 12px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; transition: border-color 0.2s; }
+        .select-selected:after { content: ""; border: 5px solid transparent; border-top-color: var(--text-main); margin-left: 10px; transform: translateY(2px); }
+        .custom-select:hover .select-selected { border-color: var(--accent); }
+        .select-items { position: absolute; background-color: var(--card-bg); top: 110%; left: 0; right: 0; z-index: 1001; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 5px 15px rgba(0,0,0,0.5); overflow: hidden; opacity: 0; visibility: hidden; transform: translateY(-5px); transition: all 0.2s; }
+        .select-items.select-open { opacity: 1; visibility: visible; transform: translateY(0); }
+        .select-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .select-item:last-child { border-bottom: none; }
+        .select-item:hover { background-color: rgba(255,255,255,0.05); color: var(--accent); }
+
+        .pcr-button { width: 32px !important; height: 32px !important; border-radius: 50% !important; overflow: hidden !important; border: none !important; box-shadow: 0 0 0 2px var(--card-bg), 0 0 0 4px var(--text-main) !important; background: transparent !important; }
+        .pcr-button::after { border-radius: 50% !important; height: 100% !important; width: 100% !important; }
+        .pcr-app { border-radius: 15px !important; background: #1e1e1e !important; }
+        .btn-reset { margin-top: 10px; padding: 12px; background: #ff4757; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; transition: transform 0.1s; }
+        .btn-reset:hover { filter: brightness(1.1); }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        
+        @media screen and (max-width: 768px) {
+            h1 { font-size: 3rem; margin-bottom: 15px; }
+            .container { padding: 15px; width: 100%; }
+            
+            .search-box { padding: 8px; }
+            input[type="text"] { font-size: 1rem; padding: 8px 15px; }
+            button[type="submit"] { width: 40px; height: 40px; min-width: 40px; }
+            
+            .links { gap: 10px; margin-top: 30px; }
+            .link-card { padding: 12px 20px; font-size: 0.9rem; width: 45%; /* По 2 в ряд */ }
+            
+            .settings-btn { top: 15px; right: 15px; opacity: 0.5; }
+            .settings-panel { 
+                position: fixed;
+                top: 50%; left: 50%; 
+                transform: translate(-50%, -50%) scale(0.9);
+                width: 90%; max-width: 320px;
+                z-index: 2000;
+                opacity: 0; visibility: hidden;
+                transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+            .settings-panel.active { 
+                transform: translate(-50%, -50%) scale(1); 
+                opacity: 1; visibility: visible;
+            }
+            
+            .history-item { padding: 15px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="space"></canvas>
+    <div id="flash-overlay"></div>
+    <button id="settingsToggle" class="settings-btn">⚙️</button>
+
+    <div id="settingsPanel" class="settings-panel">
+        <div class="setting-item"><span>Фон космоса</span><div id="picker-bg"></div></div>
+        <div class="setting-item"><span>Кнопки / Поиск</span><div id="picker-card"></div></div>
+        <div class="setting-item"><span>Основной текст</span><div id="picker-text"></div></div>
+        <div class="setting-item"><span>Акцент (UI)</span><div id="picker-accent"></div></div>
+        <div class="setting-item"><span>Звезды</span><div id="picker-stars"></div></div>
+        
+        <div class="setting-item">
+            <span>Почта</span>
+            <div class="custom-select" id="mailSelect" data-type="mail">
+                <div class="select-selected">Gmail</div>
+                <div class="select-items">
+                    <div class="select-item" data-value="gmail">Gmail</div>
+                    <div class="select-item" data-value="mailru">Mail.ru</div>
+                    <div class="select-item" data-value="yandex">Yandex</div>
+                    <div class="select-item" data-value="outlook">Outlook</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="setting-item">
+            <span>Поисковик</span>
+            <div class="custom-select" id="searchSelect" data-type="search">
+                <div class="select-selected">Google</div>
+                <div class="select-items">
+                    <div class="select-item" data-value="google">Google</div>
+                    <div class="select-item" data-value="yandex">Yandex</div>
+                    <div class="select-item" data-value="bing">Bing</div>
+                    <div class="select-item" data-value="duckduckgo">DuckDuckGo</div>
+                </div>
+            </div>
+        </div>
+
+        <button id="resetTheme" class="btn-reset">Сбросить настройки</button>
+    </div>
+
+    <div class="container">
+        <div id="clock" class="clock">00:00:00</div>
+        <h1>Search<span>Hub</span></h1>
+        
+        <div class="search-wrapper">
+            <form id="searchForm" action="https://www.google.com/search" method="GET" class="search-box">
+                <input type="text" id="searchInput" name="q" placeholder="Введи курс, пилот..." autocomplete="off">
+                <button type="submit" id="searchBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+            </form>
+            
+            <div id="historyDropdown" class="history-dropdown">
+                <div class="clear-history" id="clearHistoryBtn">Очистить бортовой журнал</div>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="https://www.youtube.com" class="link-card">YouTube</a>
+            <a href="https://github.com" class="link-card">GitHub</a>
+            <a href="https://mail.google.com" class="link-card" id="mailLink">Почта</a>
+            <a href="https://gemini.google.com" class="link-card">AI (Gemini)</a>
+        </div>
+    </div>
+
+    <script src="pickr.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
